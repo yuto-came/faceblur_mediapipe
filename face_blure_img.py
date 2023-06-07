@@ -1,12 +1,40 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from facial_landmarks import FaceLandmarks
+
+class FaceLandmarks:
+    def __init__(self):
+        mp_face_mesh = mp.solutions.face_mesh
+        self.face_mesh = mp_face_mesh.FaceMesh(static_image_mode=False,
+                                                max_num_faces=3,
+                                                refine_landmarks=False,
+                                                min_detection_confidence=0.5,
+                                                min_tracking_confidence=0.5)
+
+    def get_facial_landmarks(self, frame):
+        height, width, _ = frame.shape
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        result = self.face_mesh.process(frame_rgb)
+
+        if result.multi_face_landmarks:
+            facelandmarks_all = []
+            for facial_landmarks in result.multi_face_landmarks:
+                facelandmarks = []
+                for i in range(0, 468):
+                    pt1 = facial_landmarks.landmark[i]
+                    x = int(pt1.x * width)
+                    y = int(pt1.y * height)
+                    facelandmarks.append([x, y])
+                facelandmarks_all.append(facelandmarks)
+            return np.array(facelandmarks_all, np.int32)
+        
+        else:
+            return np.array([], np.int32)
 
 # Load face landmarks
 fl = FaceLandmarks()
 
-image_name = "yuto_test.png"
+image_name = "image.png"
 image = cv2.imread(image_name)
 
 image_copy = image.copy()
