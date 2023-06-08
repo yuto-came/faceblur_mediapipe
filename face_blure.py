@@ -1,4 +1,4 @@
-import cv2 as cv
+import cv2
 import mediapipe as mp
 import numpy as np
 
@@ -6,7 +6,7 @@ class FaceLandmarks:
     def __init__(self):
         mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = mp_face_mesh.FaceMesh(static_image_mode=False,
-                                                max_num_faces=3,
+                                                max_num_faces=100,
                                                 refine_landmarks=False,
                                                 min_detection_confidence=0.5,
                                                 min_tracking_confidence=0.5)
@@ -15,8 +15,6 @@ class FaceLandmarks:
         height, width, _ = frame.shape
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         result = self.face_mesh.process(frame_rgb)
-        # print("result:", result.multi_face_landmarks)
-        print("result qnt:", len(result.multi_face_landmarks))
 
         if result.multi_face_landmarks:
             facelandmarks_all = []
@@ -36,40 +34,47 @@ class FaceLandmarks:
 # Load face landmarks
 fl = FaceLandmarks()
 
-cap = cv.VideoCapture("person_walking.mp4")
+cap = cv2.VideoCapture(0)
 
 while True:
-  
-  ret, frame = cap.read()
-  frame = cv.resize(frame, None, fx = 0.5, fy = 0.5)
-  frame_copy = frame.copy()
-  height, width, _ = frame.shape
+    
+    ret, frame = cap.read()
 
-  # 1 Face landmark detection
-  landmarks = fl.get_facial_landmarks(frame)
-  convexhull = cv.convexHull(landmarks)
+    frame_copy = frame.copy()
+    height, width, _ = frame.shape
 
-  # 2 Face blurring
-  mask = np.zeros((height, width), np.uint8)
-  cv.polylines(mask ,[convexhull], True, 255, 3)
-  cv.fillConvexPoly(mask, convexhull, 255)
+    # 1 Face landmark detection
+    landmarks = fl.get_facial_landmarks(frame)
 
-  # Extract the Face
-  frame_copy = cv.blur(frame_copy, (27, 27))  
-  face_extracted = cv.bitwise_and(frame_copy, frame_copy, mask = mask)
-  # blureed_frame = cv.GaussianBlur(face_extracted,(27, 27), 0)
+    if landmarks.size > 0:
+        face_extracted_list = []
+        frame_copy = cv2.GaussianBlur(frame_copy, (41, 41), 0) 
+        mask = np.zeros((height, width), np.uint8)
+        for single_face in landmarks:
+            convexhull = cv2.convexHull(single_face)
 
-  # Extract background
-  background_mask = cv.bitwise_not(mask)
-  background = cv.bitwise_and(frame, frame, mask= background_mask)
+            # 2 Face blurring
+            cv2.polylines(mask ,[convexhull], True, 255, 3)
+            cv2.fillConvexPoly(mask, convexhull, 255)
 
-  # Final result
-  result = cv.add(background, face_extracted)
+            # Extract the Face
+            face_extracted = cv2.bitwise_and(frame_copy, frame_copy, mask = mask)
+            face_extracted_list.append(face_extracted)
+            # blureed_image = cv2.GaussianBlur(face_extracted,(27, 27), 0)
 
-  cv.imshow('Result', result)
-  cv.imshow('Frame', frame) 
-  key = cv.waitKey(30)
-  if key == 27:
-    break
+        # Extract background
+        background_mask = cv2.bitwise_not(mask)
+        background = cv2.bitwise_and(frame, frame, mask= background_mask)
+        for face in face_extracted_list:
+            # Final result
+            result = cv2.add(background, face)
+
+    else:
+        result = frame_copy
+
+    cv2.imshow('Result', result)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+    
 cap.release()
-cv.distroyAllWindows()
+cv2.distroyAllWindows()
